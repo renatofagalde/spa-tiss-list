@@ -1,0 +1,248 @@
+<div class="min-h-screen bg-surface-50 dark:bg-surface-900">
+  <!-- Navigation -->
+  <nav class="bg-primary shadow-lg">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex justify-between items-center h-16">
+        <!-- Logo/Title -->
+        <div class="flex items-center gap-3">
+          <i class="pi pi-chart-line text-primary-contrast text-2xl"></i>
+          <span class="text-primary-contrast text-xl font-bold">SPA TISS</span>
+        </div>
+
+        <!-- Navigation Links -->
+        <div class="flex items-center gap-4">
+          <a
+            routerLink="/dashboard"
+            routerLinkActive="bg-primary-600"
+            class="text-primary-contrast hover:bg-primary-600 px-4 py-2 rounded-md transition-colors">
+            <i class="pi pi-chart-bar mr-2"></i>
+            Dashboard
+          </a>
+
+          <p-button
+            icon="pi pi-moon"
+            severity="secondary"
+            [text]="true"
+            size="small"
+            (onClick)="toggleDarkMode()"
+            [title]="'Toggle Dark Mode'">
+          </p-button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="flex-1">
+    <div class="max-w-7xl mx-auto p-4">
+
+      <!-- Header -->
+      <div class="mb-6">
+        <h1 class="text-4xl font-bold text-surface-900 dark:text-surface-0 mb-2">
+          📊 Dashboard TISS
+        </h1>
+        <p class="text-lg text-surface-600 dark:text-surface-300">
+          Gerenciamento de arquivos de recurso de glosa
+        </p>
+      </div>
+
+      <!-- Cards de Estatísticas -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <p-card>
+          <div class="text-center">
+            <div class="text-3xl font-bold text-blue-500 mb-2">{{ totalFiles }}</div>
+            <div class="text-surface-600 dark:text-surface-300">Total de Arquivos</div>
+          </div>
+        </p-card>
+
+        <p-card>
+          <div class="text-center">
+            <div class="text-3xl font-bold text-green-500 mb-2">{{ processedFiles }}</div>
+            <div class="text-surface-600 dark:text-surface-300">Processados</div>
+          </div>
+        </p-card>
+
+        <p-card>
+          <div class="text-center">
+            <div class="text-3xl font-bold text-orange-500 mb-2">{{ incomingFiles }}</div>
+            <div class="text-surface-600 dark:text-surface-300">Recebidos</div>
+          </div>
+        </p-card>
+
+        <p-card>
+          <div class="text-center">
+            <div class="text-3xl font-bold text-purple-500 mb-2">{{ totalSizeFormatted }}</div>
+            <div class="text-surface-600 dark:text-surface-300">Tamanho Total</div>
+          </div>
+        </p-card>
+      </div>
+
+      <!-- Filtros -->
+      <p-card header="🔍 Filtros" class="mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="flex flex-col gap-2">
+            <label for="search">Buscar Arquivo</label>
+            <input
+              pInputText
+              id="search"
+              [(ngModel)]="searchTerm"
+              placeholder="Digite o nome do arquivo..."
+              (input)="applyFilters()"
+              class="w-full">
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label for="category">Categoria</label>
+            <p-select
+              [options]="categoryOptions"
+              [(ngModel)]="selectedCategory"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Todas as categorias"
+              (onChange)="applyFilters()"
+              class="w-full">
+            </p-select>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <label for="fileType">Tipo de Arquivo</label>
+            <p-select
+              [options]="fileTypeOptions"
+              [(ngModel)]="selectedFileType"
+              optionLabel="label"
+              optionValue="value"
+              placeholder="Todos os tipos"
+              (onChange)="applyFilters()"
+              class="w-full">
+            </p-select>
+          </div>
+        </div>
+
+        <!-- Botão de Refresh -->
+        <div class="flex justify-end mt-4">
+          <p-button
+            label="Atualizar Lista"
+            icon="pi pi-refresh"
+            severity="secondary"
+            (onClick)="refreshData()"
+            [loading]="loading">
+          </p-button>
+        </div>
+      </p-card>
+
+      <!-- Tabela de Arquivos -->
+      <p-card header="📁 Arquivos TISS">
+        <div *ngIf="loading" class="text-center p-8">
+          <p-progressSpinner></p-progressSpinner>
+          <p class="mt-4 text-surface-600 dark:text-surface-300">Carregando arquivos...</p>
+        </div>
+
+        <p-table
+          *ngIf="!loading"
+          [value]="filteredFiles"
+          [paginator]="true"
+          [rows]="10"
+          [rowsPerPageOptions]="[10, 25, 50]"
+          [globalFilterFields]="['fileName', 'category']"
+          [tableStyle]="{'min-width': '60rem'}"
+          responsiveLayout="scroll">
+
+          <ng-template pTemplate="header">
+            <tr>
+              <th pSortableColumn="fileName">
+                Nome do Arquivo <p-sortIcon field="fileName"></p-sortIcon>
+              </th>
+              <th pSortableColumn="category">
+                Categoria <p-sortIcon field="category"></p-sortIcon>
+              </th>
+              <th pSortableColumn="formattedDate">
+                Data <p-sortIcon field="formattedDate"></p-sortIcon>
+              </th>
+              <th pSortableColumn="formattedSize">
+                Tamanho <p-sortIcon field="formattedSize"></p-sortIcon>
+              </th>
+              <th>Tipo</th>
+              <th>Ações</th>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="body" let-file>
+            <tr>
+              <td>
+                <div class="flex items-center gap-2">
+                  <i [class]="getFileIcon(file)" class="text-lg"></i>
+                  <span class="font-medium">{{ file.fileName }}</span>
+                </div>
+              </td>
+              <td>
+                <p-tag
+                  [value]="file.category"
+                  [severity]="getCategorySeverity(file.category)">
+                </p-tag>
+              </td>
+              <td>{{ file.formattedDate }}</td>
+              <td>{{ file.formattedSize }}</td>
+              <td>
+                <p-tag
+                  [value]="getFileType(file)"
+                  [severity]="getFileTypeSeverity(file)">
+                </p-tag>
+              </td>
+              <td>
+                <div class="flex gap-2">
+                  <p-button
+                    icon="pi pi-download"
+                    severity="primary"
+                    size="small"
+                    [title]="'Download ' + file.fileName"
+                    (onClick)="downloadFile(file)">
+                  </p-button>
+                  <p-button
+                    icon="pi pi-copy"
+                    severity="secondary"
+                    size="small"
+                    [title]="'Copiar URL de download'"
+                    (onClick)="copyDownloadUrl(file)">
+                  </p-button>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="6" class="text-center p-8">
+                <div class="text-surface-500 dark:text-surface-400">
+                  <i class="pi pi-inbox text-4xl mb-4 block"></i>
+                  <p class="text-lg font-semibold mb-2">Nenhum arquivo encontrado</p>
+                  <p>Tente ajustar os filtros para encontrar os arquivos desejados.</p>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-surface-100 dark:bg-surface-800 border-t border-surface-200 dark:border-surface-700 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 py-6">
+      <div class="text-center text-surface-600 dark:text-surface-300">
+        <p class="mb-2">
+          <strong>SPA TISS List</strong> - Sistema de Gerenciamento de Recursos de Glosa
+        </p>
+        <p class="text-sm">
+          Desenvolvido com Angular 17 + PrimeNG v20 |
+          <a href="https://github.com/renatofagalde/spa-tiss-list" target="_blank" class="text-primary hover:underline">
+            <i class="pi pi-github mr-1"></i>
+            GitHub
+          </a>
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast para mensagens -->
+  <p-toast></p-toast>
+</div>

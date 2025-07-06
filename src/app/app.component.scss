@@ -1,0 +1,41 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+}
+
+.router-link-active {
+  background-color: var(--primary-600) !important;
+}
+
+// Estilos adicionais para melhorar a navegação
+nav {
+  a {
+    transition: all 0.3s ease;
+
+    &:hover {
+      transform: translateY(-1px);
+    }
+  }
+}
+
+// Responsividade para mobile
+@media (max-width: 768px) {
+  .max-w-7xl {
+    .flex {
+      flex-direction: column;
+      gap: 1rem;
+      height: auto !important;
+      padding: 1rem 0;
+    }
+  }
+
+  .navigation-links {
+    width: 100%;
+    justify-content: center;
+  }
+}
