@@ -1,0 +1,8 @@
+{
+  "/api/*": {
+    "target": "https://gz4z111dwi.execute-api.us-east-1.amazonaws.com/production/tiss",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}
