@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: Deploy to GitHub Pages
 
 on:
@@ -31,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build -- --base-href /spa-tiss-list/
+        run: npm run build -- --configuration production
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
