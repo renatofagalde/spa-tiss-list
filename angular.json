@@ -34,10 +34,11 @@
               }
             ],
             "styles": [
-              "node_modules/primeicons/primeicons.css",
+              "https://cdn.jsdelivr.net/npm/primeicons@7/primeicons.css",
+              "https://cdn.jsdelivr.net/npm/primeng@17/resources/themes/lara-light-blue/theme.css",
+              "https://cdn.jsdelivr.net/npm/primeng@17/resources/primeng.min.css",
               "src/styles.scss"
-            ]
-          },
+            ]        },
           "configurations": {
             "production": {
               "baseHref": "/spa-tiss-list/",
