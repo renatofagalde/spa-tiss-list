@@ -400,7 +400,8 @@
     [dismissableMask]="!uploading"
     [draggable]="false"
     [resizable]="false"
-    styleClass="w-full max-w-4xl"
+    styleClass="w-full max-w-4xl dark-dialog"
+    [contentStyleClass]="'bg-surface-0 dark:bg-surface-900'"
     (onHide)="closeUploadDialog()">
 
     <div class="space-y-6">
