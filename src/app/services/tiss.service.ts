@@ -16,6 +16,13 @@ export interface TissListResponse {
   next_marker: string;
 }
 
+export interface UploadResponse {
+  success: boolean;
+  message?: string;
+  key?: string;
+  error?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -42,6 +49,30 @@ export class TissService {
     const url = `${this.API_BASE}/list?bucket_name=${this.BUCKET_NAME}`;
 
     return this.http.get<TissListResponse>(url, { headers });
+  }
+
+  /**
+   * Faz upload de um arquivo
+   */
+  uploadFile(file: File, customFileName?: string): Observable<UploadResponse> {
+    const formData = new FormData();
+
+    // Nome do arquivo: usar customFileName se fornecido, senão usar nome original
+    const fileName = customFileName || file.name;
+    const fileKey = `incoming/${fileName}`;
+
+    formData.append('file', file);
+    formData.append('bucket_name', this.BUCKET_NAME);
+    formData.append('key', fileKey);
+
+    const headers = new HttpHeaders({
+      'X-Request-Journey': 'incoming-tiss-upload',
+      'X-Request-ID': this.generateUUID()
+    });
+
+    const url = `${this.API_BASE}/upload`;
+
+    return this.http.post<UploadResponse>(url, formData, { headers });
   }
 
   /**
@@ -129,5 +160,32 @@ export class TissService {
       isExcel,
       fullPath: key
     };
+  }
+
+  /**
+   * Valida se o arquivo é um tipo permitido
+   */
+  isValidFileType(file: File): boolean {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-excel', // .xls
+      'application/zip', // .zip
+      'text/xml', // .xml
+      'application/xml', // .xml
+      'application/pdf' // .pdf
+    ];
+
+    const allowedExtensions = ['.xlsx', '.xls', '.zip', '.xml', '.pdf'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+    return allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
+  }
+
+  /**
+   * Valida tamanho do arquivo (máximo 50MB)
+   */
+  isValidFileSize(file: File, maxSizeMB: number = 50): boolean {
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    return file.size <= maxSizeBytes;
   }
 }

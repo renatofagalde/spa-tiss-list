@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -9,7 +9,9 @@ import { TagModule } from 'primeng/tag';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { ToastModule } from 'primeng/toast';
+import { DialogModule } from 'primeng/dialog';
 import { MessageService } from 'primeng/api';
 import { ThemeService } from '../../services/theme.service';
 import { TissService, TissFile } from '../../services/tiss.service';
@@ -23,6 +25,14 @@ interface ProcessedFile {
   type: string;
   key: string;
   originalFile: TissFile;
+}
+
+// Interface para controle de upload
+interface UploadProgress {
+  fileName: string;
+  progress: number;
+  status: 'uploading' | 'success' | 'error';
+  message?: string;
 }
 
 @Component({
@@ -39,17 +49,27 @@ interface ProcessedFile {
     InputTextModule,
     SelectModule,
     ProgressSpinnerModule,
-    ToastModule
+    ProgressBarModule,
+    ToastModule,
+    DialogModule
   ],
   providers: [MessageService],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
 export class DashboardComponent implements OnInit {
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
+
   searchTerm = '';
   selectedCategory: any = null;
   selectedFileType: any = null;
   loading = false;
+
+  // Controles de upload
+  showUploadDialog = false;
+  uploading = false;
+  uploadProgress: UploadProgress[] = [];
+  selectedFiles: File[] = [];
 
   // Arrays de dados vindos da API real - SEM DADOS FAKE
   allFiles: ProcessedFile[] = [];
@@ -100,7 +120,7 @@ export class DashboardComponent implements OnInit {
   constructor(
     private messageService: MessageService,
     public themeService: ThemeService,
-    private tissService: TissService
+    public tissService: TissService  // Tornado público para usar no template
   ) {}
 
   ngOnInit() {
@@ -151,6 +171,189 @@ export class DashboardComponent implements OnInit {
       }
     });
   }
+
+  // ========== MÉTODOS DE UPLOAD ==========
+
+  openUploadDialog() {
+    this.showUploadDialog = true;
+    this.selectedFiles = [];
+    this.uploadProgress = [];
+  }
+
+  closeUploadDialog() {
+    if (!this.uploading) {
+      this.showUploadDialog = false;
+      this.selectedFiles = [];
+      this.uploadProgress = [];
+    }
+  }
+
+  onFileSelect(event: any) {
+    const files = Array.from(event.target.files || event.files) as File[];
+    this.validateAndAddFiles(files);
+  }
+
+  onFileDrop(event: DragEvent) {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer?.files || []) as File[];
+    this.validateAndAddFiles(files);
+  }
+
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+  }
+
+  onDragLeave(event: DragEvent) {
+    event.preventDefault();
+  }
+
+  validateAndAddFiles(files: File[]) {
+    const validFiles: File[] = [];
+
+    files.forEach(file => {
+      // Validar tipo de arquivo
+      if (!this.tissService.isValidFileType(file)) {
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Arquivo inválido',
+          detail: `${file.name} - Tipo de arquivo não permitido. Use: .xlsx, .xls, .zip, .xml, .pdf`
+        });
+        return;
+      }
+
+      // Validar tamanho (50MB)
+      if (!this.tissService.isValidFileSize(file, 50)) {
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Arquivo muito grande',
+          detail: `${file.name} - Tamanho máximo permitido: 50MB`
+        });
+        return;
+      }
+
+      // Verificar se já foi adicionado
+      if (this.selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+        this.messageService.add({
+          severity: 'warn',
+          summary: 'Arquivo duplicado',
+          detail: `${file.name} já foi adicionado`
+        });
+        return;
+      }
+
+      validFiles.push(file);
+    });
+
+    this.selectedFiles = [...this.selectedFiles, ...validFiles];
+
+    if (validFiles.length > 0) {
+      this.messageService.add({
+        severity: 'success',
+        summary: 'Arquivos adicionados',
+        detail: `${validFiles.length} arquivo(s) adicionado(s) para upload`
+      });
+    }
+  }
+
+  removeFile(index: number) {
+    this.selectedFiles.splice(index, 1);
+  }
+
+  clearFiles() {
+    this.selectedFiles = [];
+    this.uploadProgress = [];
+  }
+
+  startUpload() {
+    if (this.selectedFiles.length === 0) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Nenhum arquivo',
+        detail: 'Selecione pelo menos um arquivo para upload'
+      });
+      return;
+    }
+
+    this.uploading = true;
+    this.uploadProgress = this.selectedFiles.map(file => ({
+      fileName: file.name,
+      progress: 0,
+      status: 'uploading'
+    }));
+
+    // Upload sequencial para melhor controle
+    this.uploadFilesSequentially(0);
+  }
+
+  private uploadFilesSequentially(index: number) {
+    if (index >= this.selectedFiles.length) {
+      // Todos os uploads concluídos
+      this.uploading = false;
+
+      const successCount = this.uploadProgress.filter(p => p.status === 'success').length;
+      const errorCount = this.uploadProgress.filter(p => p.status === 'error').length;
+
+      if (successCount > 0) {
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Upload concluído',
+          detail: `${successCount} arquivo(s) enviado(s) com sucesso`
+        });
+
+        // Recarregar a lista após uploads bem-sucedidos
+        this.carregarDados();
+      }
+
+      if (errorCount > 0) {
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Alguns uploads falharam',
+          detail: `${errorCount} arquivo(s) falharam no envio`
+        });
+      }
+
+      return;
+    }
+
+    const file = this.selectedFiles[index];
+    const progress = this.uploadProgress[index];
+
+    this.tissService.uploadFile(file).subscribe({
+      next: (response) => {
+        progress.progress = 100;
+        progress.status = 'success';
+        progress.message = 'Upload concluído';
+
+        // Continuar com o próximo arquivo
+        setTimeout(() => this.uploadFilesSequentially(index + 1), 500);
+      },
+      error: (error) => {
+        console.error('Erro no upload:', error);
+        progress.progress = 100;
+        progress.status = 'error';
+        progress.message = error.error?.message || 'Erro no upload';
+
+        // Continuar com o próximo arquivo mesmo com erro
+        setTimeout(() => this.uploadFilesSequentially(index + 1), 500);
+      }
+    });
+
+    // Simular progresso (já que não temos progresso real da API)
+    this.simulateProgress(index);
+  }
+
+  private simulateProgress(index: number) {
+    const progress = this.uploadProgress[index];
+    const interval = setInterval(() => {
+      if (progress.status !== 'uploading' || progress.progress >= 90) {
+        clearInterval(interval);
+        return;
+      }
+      progress.progress += Math.random() * 10;
+    }, 200);
+  }
+
+  // ========== MÉTODOS ORIGINAIS ==========
 
   // Método para formatar data
   private formatDate(dateString: string): string {
