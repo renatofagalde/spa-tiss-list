@@ -1,5 +1,8 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import {Component} from '@angular/core';
+import {NavigationEnd, Router, RouterOutlet} from '@angular/router';
+import {filter} from 'rxjs';
+// @ts-ignore
+declare var gtag;
 
 @Component({
   selector: 'app-root',
@@ -9,5 +12,16 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  title = 'spa-tiss-list';
+  title = 'TISS';
+
+  constructor(router: Router) {
+    const navEndEvents = router.events.pipe(
+      filter(e => e instanceof NavigationEnd)
+    )
+    navEndEvents.subscribe((event:NavigationEnd)=>{
+      gtag('config', 'G-LBTVNS8NSJ',{
+        'page_path': event.urlAfterRedirects
+      });
+    })
+  }
 }
