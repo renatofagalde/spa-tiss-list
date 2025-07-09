@@ -34,14 +34,11 @@
               }
             ],
             "styles": [
-              "https://cdn.jsdelivr.net/npm/primeicons@7/primeicons.css",
-              "https://cdn.jsdelivr.net/npm/primeng@17/resources/themes/lara-light-blue/theme.css",
-              "https://cdn.jsdelivr.net/npm/primeng@17/resources/primeng.min.css",
               "src/styles.scss"
-            ]        },
+            ]
+          },
           "configurations": {
             "production": {
-              "baseHref": "/spa-tiss-list/",
               "budgets": [
                 {
                   "type": "initial",
@@ -75,30 +72,6 @@
             }
           },
           "defaultConfiguration": "development"
-        },
-        "extract-i18n": {
-          "builder": "@angular/build:extract-i18n"
-        },
-        "test": {
-          "builder": "@angular/build:karma",
-          "options": {
-            "polyfills": [
-              "zone.js",
-              "zone.js/testing"
-            ],
-            "tsConfig": "tsconfig.spec.json",
-            "inlineStyleLanguage": "scss",
-            "assets": [
-              {
-                "glob": "**/*",
-                "input": "public"
-              }
-            ],
-            "styles": [
-              "node_modules/primeicons/primeicons.css",
-              "src/styles.scss"
-            ]
-          }
         }
       }
     }
