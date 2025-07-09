@@ -19,8 +19,8 @@ export class AppComponent {
       filter(e => e instanceof NavigationEnd)
     )
     navEndEvents.subscribe((event:NavigationEnd)=>{
-      console.log("versao analytics: G-TFNF1VKKNR")
-      gtag('config', 'G-TFNF1VKKNR',{
+      console.log("versao analytics 0.3: G-DM9E67J8GS")
+      gtag('config', 'G-DM9E67J8GS',{
         'page_path': event.urlAfterRedirects
       });
     })

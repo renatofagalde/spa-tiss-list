@@ -17,4 +17,4 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPA_TISS_LIST_MVP }}
           channelId: live
-          projectId: spa-tiss-list-mvp
+          projectId: spa-tiss-mvp
