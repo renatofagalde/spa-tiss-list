@@ -19,6 +19,7 @@ export class AppComponent {
       filter(e => e instanceof NavigationEnd)
     )
     navEndEvents.subscribe((event:NavigationEnd)=>{
+      console.table(event)
       gtag('config', 'G-D90V95J7HQ',{
         'page_path': event.urlAfterRedirects
       });
