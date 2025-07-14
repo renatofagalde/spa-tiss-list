@@ -8,7 +8,7 @@ declare var gtag;
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet],
-  templateUrl: './app.component.html',  // ← Corrigir para este
+  templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
@@ -19,7 +19,7 @@ export class AppComponent {
       filter(e => e instanceof NavigationEnd)
     )
     navEndEvents.subscribe((event:NavigationEnd)=>{
-      console.log("versao analytics 0.3: G-DM9E67J8GS")
+      console.log("versao 04 url presigned-url")
       gtag('config', 'G-DM9E67J8GS',{
         'page_path': event.urlAfterRedirects
       });
