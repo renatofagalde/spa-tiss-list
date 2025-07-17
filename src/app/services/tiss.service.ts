@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 export interface TissFile {
   key: string;
@@ -23,6 +24,26 @@ export interface UploadResponse {
   error?: string;
 }
 
+// ✅ Novas interfaces para presigned URL
+export interface PresignedUrlRequest {
+  bucket_name: string;
+  key: string;
+  content_type: string;
+  expires: number;
+  metadata: {
+    department: string;
+    author: string;
+    version: string;
+  };
+}
+
+export interface PresignedUrlResponse {
+  upload_url: string;
+  bucket_name: string;
+  key: string;
+  expires_at: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -34,10 +55,6 @@ export class TissService {
 
   /**
    * Lista todos os arquivos do bucket TISS
-   * curl --location 'https://gz4z111dwi.execute-api.us-east-1.amazonaws.com/production/tiss/api/storage/list?bucket_name=prd-tiss' \
-   * --header 'Content-Type: application/json' \
-   * --header 'X-Request-Journey: list-bucket-files' \
-   * --header 'X-Request-ID: 40005644-8403-4d8d-8603-4e2614489daa'
    */
   listFiles(): Observable<TissListResponse> {
     const headers = new HttpHeaders({
@@ -47,40 +64,100 @@ export class TissService {
     });
 
     const url = `${this.API_BASE}/list?bucket_name=${this.BUCKET_NAME}`;
-
     return this.http.get<TissListResponse>(url, { headers });
   }
 
   /**
-   * Faz upload de um arquivo
+   * ✅ NOVO: Upload usando presigned URL (sem limitação de 5MB!)
+   * 1. Solicita presigned URL do backend
+   * 2. Faz upload direto para S3
    */
   uploadFile(file: File, customFileName?: string): Observable<UploadResponse> {
-    const formData = new FormData();
-
     // Nome do arquivo: usar customFileName se fornecido, senão usar nome original
     const fileName = customFileName || file.name;
-    const fileKey = `incoming/${fileName}`;
 
-    formData.append('file', file);
-    formData.append('bucket_name', this.BUCKET_NAME);
-    formData.append('key', fileKey);
+    // ✅ Detectar hostname para usar como author
+    const hostname = window.location.hostname;
 
+    // Preparar requisição para presigned URL
+    const presignedRequest: PresignedUrlRequest = {
+      bucket_name: this.BUCKET_NAME,
+      key: fileName, // O backend vai automaticamente adicionar "incoming/" se necessário
+      content_type: file.type || 'application/octet-stream',
+      expires: 1800, // 30 minutos
+      metadata: {
+        department: 'tiss',
+        author: hostname, // ✅ Host que está rodando o app Angular
+        version: '1.0'
+      }
+    };
+
+    // 1. Solicitar presigned URL
+    return this.getPresignedUrl(presignedRequest).pipe(
+      // 2. Usar a URL para upload direto
+      switchMap((presignedResponse) =>
+        this.uploadToS3(presignedResponse.upload_url, file, presignedResponse.key)
+      )
+    );
+  }
+
+  /**
+   * ✅ Solicita presigned URL do backend
+   */
+  private getPresignedUrl(request: PresignedUrlRequest): Observable<PresignedUrlResponse> {
     const headers = new HttpHeaders({
-      'X-Request-Journey': 'incoming-tiss-upload',
+      'Content-Type': 'application/json',
+      'X-Request-Journey': 'upload-with-metadata',
       'X-Request-ID': this.generateUUID()
     });
 
-    const url = `${this.API_BASE}/upload`;
+    const url = `${this.API_BASE}/presigned-url`;
+    return this.http.post<PresignedUrlResponse>(url, request, { headers });
+  }
 
-    return this.http.post<UploadResponse>(url, formData, { headers });
+  /**
+   * ✅ Faz upload direto para S3 usando presigned URL
+   * Envia apenas Content-Type (sem metadados)
+   */
+  private uploadToS3(uploadUrl: string, file: File, finalKey: string): Observable<UploadResponse> {
+    const headers = new HttpHeaders({
+      'Content-Type': file.type || 'application/octet-stream'
+    });
+
+    return new Observable<UploadResponse>(observer => {
+      this.http.put(uploadUrl, file, {
+        headers,
+        observe: 'response'
+      }).subscribe({
+        next: (response) => {
+          if (response.status === 200) {
+            observer.next({
+              success: true,
+              message: 'Upload realizado com sucesso',
+              key: finalKey
+            });
+          } else {
+            observer.next({
+              success: false,
+              error: `Upload falhou com status: ${response.status}`
+            });
+          }
+          observer.complete();
+        },
+        error: (error) => {
+          console.error('Erro no upload para S3:', error);
+          observer.next({
+            success: false,
+            error: error.error?.message || 'Erro no upload para S3'
+          });
+          observer.complete();
+        }
+      });
+    });
   }
 
   /**
    * Gera a URL de download para um arquivo
-   * curl --location 'https://gz4z111dwi.execute-api.us-east-1.amazonaws.com/production/tiss/api/storage/download/prd-tiss/processed-tiss/recurso_glosa/2025/07/05/prd001_xmls.zip' \
-   * --header 'Content-Type: application/json' \
-   * --header 'X-Request-Journey: list-bucket-files' \
-   * --header 'X-Request-ID: $(uuidgen)'
    */
   getDownloadUrl(fileKey: string): string {
     return `${this.API_BASE}/download/${this.BUCKET_NAME}/${fileKey}`;
@@ -97,7 +174,6 @@ export class TissService {
     });
 
     const url = this.getDownloadUrl(fileKey);
-
     return this.http.get(url, {
       headers,
       responseType: 'blob'
@@ -182,9 +258,10 @@ export class TissService {
   }
 
   /**
-   * Valida tamanho do arquivo (máximo 50MB)
+   * ✅ Removida limitação de tamanho - agora sem limite!
+   * Mas mantemos validação opcional para UX
    */
-  isValidFileSize(file: File, maxSizeMB: number = 50): boolean {
+  isValidFileSize(file: File, maxSizeMB: number = 1000): boolean { // ✅ Aumentado para 1GB como exemplo
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     return file.size <= maxSizeBytes;
   }

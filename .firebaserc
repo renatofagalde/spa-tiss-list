@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "spa-tiss-mvp"
-  }
+    "default": "spa-tiss-mvp",
+    "spa-tiss-mvp": "spa-tiss-mvp"
+  },
+  "targets": {},
+  "etags": {}
 }

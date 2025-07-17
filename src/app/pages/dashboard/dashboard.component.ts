@@ -65,13 +65,13 @@ export class DashboardComponent implements OnInit {
   selectedFileType: any = null;
   loading = false;
 
-  // Controles de upload
+  // Controles de upload - ✅ ARQUIVO ÚNICO
   showUploadDialog = false;
   uploading = false;
   uploadProgress: UploadProgress[] = [];
-  selectedFiles: File[] = [];
+  selectedFile: File | null = null; // ✅ Mudou de selectedFiles[] para arquivo único
 
-  // Arrays de dados vindos da API real - SEM DADOS FAKE
+  // Arrays de dados vindos da API real
   allFiles: ProcessedFile[] = [];
   filteredFiles: ProcessedFile[] = [];
 
@@ -94,12 +94,19 @@ export class DashboardComponent implements OnInit {
 
   get totalSizeFormatted(): string {
     if (this.allFiles.length === 0) return '0 KB';
-
     const totalBytes = this.allFiles.reduce((total, file) => {
       return total + file.originalFile.size;
     }, 0);
-
     return this.tissService.formatFileSize(totalBytes);
+  }
+
+  // ✅ Getters para template do arquivo único
+  get hasSelectedFile(): boolean {
+    return this.selectedFile !== null;
+  }
+
+  get selectedFileSize(): string {
+    return this.selectedFile ? this.tissService.formatFileSize(this.selectedFile.size) : '';
   }
 
   // Opções para selects
@@ -120,7 +127,7 @@ export class DashboardComponent implements OnInit {
   constructor(
     private messageService: MessageService,
     public themeService: ThemeService,
-    public tissService: TissService  // Tornado público para usar no template
+    public tissService: TissService
   ) {}
 
   ngOnInit() {
@@ -134,7 +141,6 @@ export class DashboardComponent implements OnInit {
       next: (response) => {
         this.allFiles = response.objects.map(file => {
           const pathInfo = this.tissService.parseFilePath(file.key);
-
           return {
             fileName: pathInfo.fileName,
             category: pathInfo.category,
@@ -165,38 +171,41 @@ export class DashboardComponent implements OnInit {
           detail: 'Não foi possível carregar os arquivos. Verifique sua conexão.'
         });
 
-        // Mantém arrays vazios em caso de erro
         this.allFiles = [];
         this.filteredFiles = [];
       }
     });
   }
 
-  // ========== MÉTODOS DE UPLOAD ==========
+  // ========== MÉTODOS DE UPLOAD - ✅ ARQUIVO ÚNICO ==========
 
   openUploadDialog() {
     this.showUploadDialog = true;
-    this.selectedFiles = [];
+    this.selectedFile = null;
     this.uploadProgress = [];
   }
 
   closeUploadDialog() {
     if (!this.uploading) {
       this.showUploadDialog = false;
-      this.selectedFiles = [];
+      this.selectedFile = null;
       this.uploadProgress = [];
     }
   }
 
   onFileSelect(event: any) {
-    const files = Array.from(event.target.files || event.files) as File[];
-    this.validateAndAddFiles(files);
+    const files = Array.from(event.target.files) as File[];
+    if (files.length > 0) {
+      this.validateAndSetFile(files[0]); // ✅ Só pega o primeiro arquivo
+    }
   }
 
   onFileDrop(event: DragEvent) {
     event.preventDefault();
     const files = Array.from(event.dataTransfer?.files || []) as File[];
-    this.validateAndAddFiles(files);
+    if (files.length > 0) {
+      this.validateAndSetFile(files[0]); // ✅ Só pega o primeiro arquivo
+    }
   }
 
   onDragOver(event: DragEvent) {
@@ -207,155 +216,130 @@ export class DashboardComponent implements OnInit {
     event.preventDefault();
   }
 
-  validateAndAddFiles(files: File[]) {
-    const validFiles: File[] = [];
-
-    files.forEach(file => {
-      // Validar tipo de arquivo
-      if (!this.tissService.isValidFileType(file)) {
-        this.messageService.add({
-          severity: 'warn',
-          summary: 'Arquivo inválido',
-          detail: `${file.name} - Tipo de arquivo não permitido. Use: .xlsx, .xls, .zip, .xml, .pdf`
-        });
-        return;
-      }
-
-      // Validar tamanho (50MB)
-      if (!this.tissService.isValidFileSize(file, 50)) {
-        this.messageService.add({
-          severity: 'warn',
-          summary: 'Arquivo muito grande',
-          detail: `${file.name} - Tamanho máximo permitido: 50MB`
-        });
-        return;
-      }
-
-      // Verificar se já foi adicionado
-      if (this.selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
-        this.messageService.add({
-          severity: 'warn',
-          summary: 'Arquivo duplicado',
-          detail: `${file.name} já foi adicionado`
-        });
-        return;
-      }
-
-      validFiles.push(file);
-    });
-
-    this.selectedFiles = [...this.selectedFiles, ...validFiles];
-
-    if (validFiles.length > 0) {
+  // ✅ Validação e seleção de arquivo único
+  validateAndSetFile(file: File) {
+    // Validar tipo de arquivo
+    if (!this.tissService.isValidFileType(file)) {
       this.messageService.add({
-        severity: 'success',
-        summary: 'Arquivos adicionados',
-        detail: `${validFiles.length} arquivo(s) adicionado(s) para upload`
+        severity: 'warn',
+        summary: 'Arquivo inválido',
+        detail: `${file.name} - Tipo de arquivo não permitido. Use: .xlsx, .xls, .zip, .xml, .pdf`
       });
+      return;
     }
+
+    // ✅ Sem limitação rigorosa de tamanho - aceita arquivos grandes!
+    if (!this.tissService.isValidFileSize(file, 1000)) { // 1GB como limite de bom senso
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Arquivo muito grande',
+        detail: `${file.name} - Tamanho máximo sugerido: 1GB`
+      });
+      return;
+    }
+
+    this.selectedFile = file;
+    this.messageService.add({
+      severity: 'success',
+      summary: 'Arquivo selecionado',
+      detail: `${file.name} pronto para upload`
+    });
   }
 
-  removeFile(index: number) {
-    this.selectedFiles.splice(index, 1);
+  removeFile() {
+    this.selectedFile = null;
   }
 
   clearFiles() {
-    this.selectedFiles = [];
+    this.selectedFile = null;
     this.uploadProgress = [];
   }
 
   startUpload() {
-    if (this.selectedFiles.length === 0) {
+    if (!this.selectedFile) {
       this.messageService.add({
         severity: 'warn',
         summary: 'Nenhum arquivo',
-        detail: 'Selecione pelo menos um arquivo para upload'
+        detail: 'Selecione um arquivo para upload'
       });
       return;
     }
 
     this.uploading = true;
-    this.uploadProgress = this.selectedFiles.map(file => ({
-      fileName: file.name,
+    this.uploadProgress = [{
+      fileName: this.selectedFile.name,
       progress: 0,
       status: 'uploading'
-    }));
+    }];
 
-    // Upload sequencial para melhor controle
-    this.uploadFilesSequentially(0);
+    this.uploadSingleFile();
   }
 
-  private uploadFilesSequentially(index: number) {
-    if (index >= this.selectedFiles.length) {
-      // Todos os uploads concluídos
-      this.uploading = false;
+  // ✅ Upload de arquivo único usando presigned URL
+  private uploadSingleFile() {
+    if (!this.selectedFile) return;
 
-      const successCount = this.uploadProgress.filter(p => p.status === 'success').length;
-      const errorCount = this.uploadProgress.filter(p => p.status === 'error').length;
+    const file = this.selectedFile;
+    const progress = this.uploadProgress[0];
 
-      if (successCount > 0) {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Upload concluído',
-          detail: `${successCount} arquivo(s) enviado(s) com sucesso`
-        });
-
-        // Recarregar a lista após uploads bem-sucedidos
-        this.carregarDados();
-      }
-
-      if (errorCount > 0) {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Alguns uploads falharam',
-          detail: `${errorCount} arquivo(s) falharam no envio`
-        });
-      }
-
-      return;
-    }
-
-    const file = this.selectedFiles[index];
-    const progress = this.uploadProgress[index];
+    // Simular progresso inicial
+    const progressInterval = this.simulateProgress(0);
 
     this.tissService.uploadFile(file).subscribe({
       next: (response) => {
+        clearInterval(progressInterval);
         progress.progress = 100;
         progress.status = 'success';
-        progress.message = 'Upload concluído';
+        progress.message = 'Upload concluído com sucesso!';
 
-        // Continuar com o próximo arquivo
-        setTimeout(() => this.uploadFilesSequentially(index + 1), 500);
+        this.uploading = false;
+
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Upload concluído',
+          detail: `${file.name} enviado com sucesso`
+        });
+
+        // ✅ Fechar dialog após sucesso e atualizar listagem
+        setTimeout(() => {
+          this.closeUploadDialog();
+          this.carregarDados(); // Atualizar a lista
+        }, 1500);
       },
       error: (error) => {
+        clearInterval(progressInterval);
         console.error('Erro no upload:', error);
         progress.progress = 100;
         progress.status = 'error';
         progress.message = error.error?.message || 'Erro no upload';
 
-        // Continuar com o próximo arquivo mesmo com erro
-        setTimeout(() => this.uploadFilesSequentially(index + 1), 500);
+        this.uploading = false;
+
+        this.messageService.add({
+          severity: 'error',
+          summary: 'Erro no upload',
+          detail: error.error?.message || 'Falha ao enviar arquivo'
+        });
       }
     });
-
-    // Simular progresso (já que não temos progresso real da API)
-    this.simulateProgress(index);
   }
 
-  private simulateProgress(index: number) {
+  // ✅ Simulação de progresso - retorna interval para poder limpar
+  private simulateProgress(index: number): any {
     const progress = this.uploadProgress[index];
-    const interval = setInterval(() => {
+    return setInterval(() => {
       if (progress.status !== 'uploading' || progress.progress >= 90) {
-        clearInterval(interval);
         return;
       }
-      progress.progress += Math.random() * 10;
-    }, 200);
+      progress.progress += Math.random() * 15;
+      if (progress.progress > 90) {
+        progress.progress = 90; // Para no 90% até o upload real terminar
+      }
+    }, 300);
   }
 
-  // ========== MÉTODOS ORIGINAIS ==========
+  // ========== MÉTODOS UTILITÁRIOS ==========
 
-  // Método para formatar data
   private formatDate(dateString: string): string {
     try {
       const date = new Date(dateString);
@@ -371,7 +355,6 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  // Método para determinar tipo do arquivo pelo nome
   private getFileTypeFromName(fileName: string): string {
     const extension = fileName.split('.').pop()?.toUpperCase();
     switch (extension) {
@@ -389,16 +372,6 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  refreshData() {
-    this.messageService.add({
-      severity: 'info',
-      summary: 'Atualizando dados',
-      detail: 'Buscando arquivos mais recentes...'
-    });
-    this.carregarDados();
-  }
-
-  // Método para obter horário atual
   getCurrentTime(): string {
     const now = new Date();
     return now.toLocaleTimeString('pt-BR', {
@@ -408,6 +381,8 @@ export class DashboardComponent implements OnInit {
       month: 'short'
     });
   }
+
+  // ========== MÉTODOS DE FILTROS ==========
 
   applyFilters() {
     this.filteredFiles = this.allFiles.filter(file => {
@@ -437,11 +412,21 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  refreshData() {
+    this.messageService.add({
+      severity: 'info',
+      summary: 'Atualizando dados',
+      detail: 'Buscando arquivos mais recentes...'
+    });
+    this.carregarDados();
+  }
+
   toggleDarkMode() {
     this.themeService.toggleTheme();
   }
 
-  // Métodos para ícones e severidades
+  // ========== MÉTODOS PARA ÍCONES E SEVERIDADES ==========
+
   getFileIcon(file: ProcessedFile): string {
     switch (file.type) {
       case 'ZIP':
@@ -470,7 +455,6 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  // Método público para usar no template - retorna o tipo do arquivo
   getFileType(file: ProcessedFile): string {
     return file.type;
   }
@@ -490,6 +474,8 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  // ========== MÉTODOS DE DOWNLOAD ==========
+
   downloadFile(file: ProcessedFile) {
     this.messageService.add({
       severity: 'info',
@@ -497,10 +483,8 @@ export class DashboardComponent implements OnInit {
       detail: `Baixando ${file.fileName}...`
     });
 
-    // Usar o serviço real para download
     this.tissService.downloadFile(file.key).subscribe({
       next: (blob) => {
-        // Criar URL do blob e fazer download
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
