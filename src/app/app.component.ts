@@ -19,7 +19,7 @@ export class AppComponent {
       filter(e => e instanceof NavigationEnd)
     )
     navEndEvents.subscribe((event:NavigationEnd)=>{
-      console.log("versao 04 url presigned-url")
+      console.log("versao 01 tag G-DM9E67J8GS")
       gtag('config', 'G-DM9E67J8GS',{
         'page_path': event.urlAfterRedirects
       });
