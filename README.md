@@ -10,7 +10,7 @@ A aplicação foi criada como parte de um MVP para visualização e interação 
 
 Você pode acessar a versão hospedada diretamente pelo Firebase Hosting através do link:
 
-👉 [https://spa-tiss-list-mvp.web.app/](https://spa-tiss-list-mvp.web.app/)
+👉 [https://spa-tiss-mvp.web.app/](https://spa-tiss-mvp.web.app/)
 
 A aplicação está **hospedada no Google Firebase**, garantindo alta disponibilidade e distribuição via CDN.
 
